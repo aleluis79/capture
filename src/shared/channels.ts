@@ -1,0 +1,32 @@
+export const IPC = {
+  platformInfo: 'platform:info',
+  settingsGet: 'settings:get',
+  settingsSet: 'settings:set',
+  settingsChooseOutputDir: 'settings:choose-output-dir',
+  sourcesList: 'sources:list',
+  sourcesSetPending: 'sources:set-pending',
+  recorderStart: 'recorder:start',
+  recorderChunk: 'recorder:chunk',
+  recorderFinish: 'recorder:finish',
+  recorderAbort: 'recorder:abort',
+  historyList: 'history:list',
+  historyRemove: 'history:remove',
+  historyReveal: 'history:reveal',
+  historyOpenFolder: 'history:open-folder',
+  historyCleanup: 'history:cleanup',
+  historyOrphans: 'history:orphans',
+  historyRecover: 'history:recover',
+  historyDiscardOrphan: 'history:discard-orphan',
+  exportPickOutput: 'export:pick-output',
+  exportRun: 'export:run',
+  exportCancel: 'export:cancel',
+  exportProgress: 'export:progress',
+  shortcutToggle: 'shortcut:toggle',
+  shortcutSet: 'shortcut:set',
+  shortcutGet: 'shortcut:get',
+  windowHide: 'window:hide',
+  windowShow: 'window:show',
+  appRevealPath: 'app:reveal-path'
+} as const
+
+export type IpcChannel = (typeof IPC)[keyof typeof IPC]

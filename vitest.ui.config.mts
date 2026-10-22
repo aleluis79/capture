@@ -1,0 +1,20 @@
+import { resolve } from 'node:path'
+import react from '@vitejs/plugin-react'
+import { defineConfig } from 'vitest/config'
+
+export default defineConfig({
+  plugins: [react()],
+  resolve: {
+    alias: {
+      '@renderer': resolve('src/renderer/src'),
+      '@shared': resolve('src/shared')
+    }
+  },
+  test: {
+    name: 'ui',
+    environment: 'jsdom',
+    include: ['tests/ui/**/*.test.tsx'],
+    setupFiles: ['tests/ui/setup.ts'],
+    passWithNoTests: true
+  }
+})

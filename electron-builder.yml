@@ -1,0 +1,59 @@
+appId: com.alejandro.captura
+productName: Captura
+copyright: Copyright © 2026 Alejandro
+directories:
+  buildResources: build
+  output: dist
+files:
+  - out/**
+  - package.json
+extraResources:
+  - from: node_modules/ffmpeg-static
+    to: ffmpeg
+    filter:
+      - ffmpeg
+      - ffmpeg.exe
+asar: true
+linux:
+  target:
+    - deb
+    - AppImage
+  category: AudioVideo
+  icon: build/icon.png
+  executableName: captura
+  maintainer: Alejandro <ale.luis@gmail.com>
+  syncDesktopName: true
+  synopsis: Grabador de pantalla simple
+  description: Grabador de pantalla, ventana o región con exportación a MP4.
+  desktop:
+    entry:
+      Name: Captura
+      Comment: Grabador de pantalla simple
+      Categories: AudioVideo;Recorder;
+      Keywords: grabacion;pantalla;video;
+      StartupWMClass: captura
+deb:
+  afterInstall: build/linux-after-install.sh
+  depends:
+    - libgtk-3-0
+    - libnotify4
+    - libnss3
+    - libxss1
+    - libxtst6
+    - xdg-utils
+    - libatspi2.0-0
+    - libuuid1
+    - libsecret-1-0
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  icon: build/icon.ico
+  executableName: captura
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  shortcutName: Captura
