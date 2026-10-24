@@ -69,7 +69,7 @@ export function buildPlatformInfo(
     sessionType,
     needsSystemPicker: needsSystemPicker(sessionType),
     cursorNotice: cursorNotice(sessionType),
-    canEnableSystemAudio: false,
+    canEnableSystemAudio: sessionType !== 'unknown',
     appVersion
   }
 }

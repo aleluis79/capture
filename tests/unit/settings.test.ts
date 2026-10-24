@@ -9,13 +9,19 @@ import {
 const defaults = createDefaultSettings('/home/alejandro/Vídeos/Capturas')
 
 describe('createDefaultSettings', () => {
-  it('usa 1080p, 30 FPS, calidad media y 3 s de cuenta atrás', () => {
+  it('usa 1080p, 30 FPS, calidad media y 3 s de cuenta atrás con audio desactivado por defecto', () => {
     expect(defaults).toMatchObject({
       resolution: '1080p',
       fps: 30,
       quality: 'medium',
       countdownSeconds: 3,
-      keepSource: true
+      keepSource: true,
+      systemAudio: false,
+      micAudio: false,
+      micDeviceId: 'default',
+      systemAudioGain: 1,
+      micGain: 1,
+      normalizeAudio: true
     })
   })
 
@@ -45,7 +51,7 @@ describe('sanitizeSettings', () => {
     expect(sanitizeSettings([], defaults)).toEqual(defaults)
   })
 
-  it('conserva valores válidos', () => {
+  it('conserva valores válidos incluidos los ajustes de audio', () => {
     const custom = {
       ...defaults,
       resolution: '720p',
@@ -53,10 +59,48 @@ describe('sanitizeSettings', () => {
       quality: 'high',
       countdownSeconds: 1,
       outputDir: '/tmp/salida',
-      keepSource: false
+      keepSource: false,
+      systemAudio: true,
+      micAudio: true,
+      micDeviceId: 'usb-mic-1',
+      systemAudioGain: 2.5,
+      micGain: 0.5,
+      normalizeAudio: false
     }
 
     expect(sanitizeSettings(custom, defaults)).toEqual(custom)
+  })
+
+  it('sanea ganancias fuera de rango y normalización inválida', () => {
+    const result = sanitizeSettings(
+      {
+        ...defaults,
+        systemAudioGain: 0.1,
+        micGain: 9,
+        normalizeAudio: 'sí'
+      },
+      defaults
+    )
+
+    expect(result.systemAudioGain).toBe(1)
+    expect(result.micGain).toBe(1)
+    expect(result.normalizeAudio).toBe(true)
+  })
+
+  it('sanea ajustes de audio inválidos a los valores por defecto', () => {
+    const result = sanitizeSettings(
+      {
+        ...defaults,
+        systemAudio: 'yes',
+        micAudio: 1,
+        micDeviceId: '   '
+      },
+      defaults
+    )
+
+    expect(result.systemAudio).toBe(false)
+    expect(result.micAudio).toBe(false)
+    expect(result.micDeviceId).toBe('default')
   })
 
   it('ignora claves desconocidas', () => {

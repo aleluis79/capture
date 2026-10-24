@@ -170,4 +170,16 @@ describe('sanitizeHistory', () => {
 
     expect(result[0].exports).toEqual([])
   })
+
+  it('normaliza hasAudio a booleano en entradas del historial', () => {
+    const result = sanitizeHistory([
+      makeEntry({ id: 'con-audio', hasAudio: true }),
+      makeEntry({ id: 'sin-audio' }),
+      makeEntry({ id: 'invalido', hasAudio: 'si' as never })
+    ])
+
+    expect(result.find((entry) => entry.id === 'con-audio')?.hasAudio).toBe(true)
+    expect(result.find((entry) => entry.id === 'sin-audio')?.hasAudio).toBe(false)
+    expect(result.find((entry) => entry.id === 'invalido')?.hasAudio).toBe(false)
+  })
 })

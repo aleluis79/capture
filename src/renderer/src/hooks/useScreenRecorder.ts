@@ -3,12 +3,15 @@ import type { HistoryEntry, QualityPreset, RecordingMode, Region, Size } from '@
 import { t } from '../i18n/es'
 import {
   acquireDisplayStream,
+  acquireMicStream,
+  composeCaptureStream,
+  createAudioPipeline,
   createMediaRecorder,
   createRegionPipeline,
   getStreamVideoSize,
   stopStream
 } from '../lib/capture'
-import type { RegionPipeline } from '../lib/capture'
+import type { AudioPipeline, RegionPipeline } from '../lib/capture'
 import { initialRecordingState, recordingReducer } from '../lib/recordingReducer'
 import type { RecordingState } from '../lib/recordingReducer'
 
@@ -19,6 +22,11 @@ export interface StartRecordingOptions {
   fps: number
   quality: QualityPreset
   countdownSeconds: number
+  systemAudio?: boolean
+  micAudio?: boolean
+  micDeviceId?: string
+  systemAudioGain?: number
+  micGain?: number
 }
 
 interface CaptureMeta {
@@ -28,6 +36,7 @@ interface CaptureMeta {
   quality: QualityPreset
   width: number
   height: number
+  hasAudio: boolean
 }
 
 interface UseScreenRecorderOptions {
@@ -51,6 +60,7 @@ export interface ScreenRecorderController {
   cancelExport: () => void
   reportError: (message: string) => void
   clearError: () => void
+  audioLevel: number
 }
 
 function delay(ms: number): Promise<void> {
@@ -63,6 +73,12 @@ function cleanErrorMessage(error: unknown): string {
   if (error instanceof Error) {
     const message = error.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '')
 
+    if (message === 'MIC_PERMISSION_DENIED') {
+      return 'No se concedió permiso para usar el micrófono.'
+    }
+    if (message === 'MIC_UNAVAILABLE') {
+      return 'No se pudo acceder al micrófono seleccionado.'
+    }
     if (/permission denied|notallowed|denied by the user|user denied/i.test(message)) {
       return 'No se concedió permiso para capturar la pantalla.'
     }
@@ -84,6 +100,7 @@ function cleanErrorMessage(error: unknown): string {
 export function useScreenRecorder(options: UseScreenRecorderOptions): ScreenRecorderController {
   const [state, dispatch] = useReducer(recordingReducer, initialRecordingState)
   const [preparing, setPreparing] = useState(false)
+  const [audioLevel, setAudioLevel] = useState(0)
 
   const stateRef = useRef(state)
   const onFinishedRef = useRef(options.onFinished)
@@ -92,6 +109,7 @@ export function useScreenRecorder(options: UseScreenRecorderOptions): ScreenReco
   const recorderRef = useRef<MediaRecorder | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const pipelineRef = useRef<RegionPipeline | null>(null)
+  const audioPipelineRef = useRef<AudioPipeline | null>(null)
   const sessionIdRef = useRef<string | null>(null)
   const metaRef = useRef<CaptureMeta | null>(null)
   const queueRef = useRef<Blob[]>([])
@@ -100,6 +118,7 @@ export function useScreenRecorder(options: UseScreenRecorderOptions): ScreenReco
   const stoppingRef = useRef(false)
   const cancelledRef = useRef(false)
   const timerRef = useRef<number | null>(null)
+  const levelTimerRef = useRef<number | null>(null)
   const startedAtRef = useRef(0)
   const lastTickRef = useRef(0)
 
@@ -147,13 +166,24 @@ export function useScreenRecorder(options: UseScreenRecorderOptions): ScreenReco
     }
   }, [])
 
+  const stopLevelMonitor = useCallback(() => {
+    if (levelTimerRef.current !== null) {
+      window.clearInterval(levelTimerRef.current)
+      levelTimerRef.current = null
+    }
+    setAudioLevel(0)
+  }, [])
+
   const cleanupStreams = useCallback(() => {
     pipelineRef.current?.stop()
     pipelineRef.current = null
+    audioPipelineRef.current?.stop()
+    audioPipelineRef.current = null
     stopStream(streamRef.current)
     streamRef.current = null
     stopTimer()
-  }, [stopTimer])
+    stopLevelMonitor()
+  }, [stopLevelMonitor, stopTimer])
 
   const abortSession = useCallback(async () => {
     const sessionId = sessionIdRef.current
@@ -221,7 +251,8 @@ export function useScreenRecorder(options: UseScreenRecorderOptions): ScreenReco
         width: meta.width,
         height: meta.height,
         fps: meta.fps,
-        mode: meta.mode
+        mode: meta.mode,
+        hasAudio: meta.hasAudio
       })
 
       sessionIdRef.current = null
@@ -303,8 +334,11 @@ export function useScreenRecorder(options: UseScreenRecorderOptions): ScreenReco
       let stream = startOptions.stream ?? null
 
       try {
+        const systemAudio = Boolean(startOptions.systemAudio)
+        const micAudio = Boolean(startOptions.micAudio)
+
         if (!stream) {
-          stream = await acquireDisplayStream(startOptions.fps)
+          stream = await acquireDisplayStream(startOptions.fps, systemAudio)
         }
         streamRef.current = stream
 
@@ -315,6 +349,27 @@ export function useScreenRecorder(options: UseScreenRecorderOptions): ScreenReco
           return
         }
 
+        const micStream = micAudio
+          ? await acquireMicStream(startOptions.micDeviceId ?? 'default')
+          : null
+
+        if (cancelledRef.current) {
+          stopStream(micStream)
+          cleanupStreams()
+          runningRef.current = false
+          setPreparing(false)
+          return
+        }
+
+        const audioPipeline = createAudioPipeline({
+          displayStream: stream,
+          systemAudio,
+          systemAudioGain: startOptions.systemAudioGain,
+          micStream,
+          micGain: startOptions.micGain
+        })
+        audioPipelineRef.current = audioPipeline
+
         let captureStream = stream
         let size: Size
 
@@ -322,7 +377,12 @@ export function useScreenRecorder(options: UseScreenRecorderOptions): ScreenReco
           if (!startOptions.region) {
             throw new Error(t.errors.selectRegion)
           }
-          const pipeline = await createRegionPipeline(stream, startOptions.region, startOptions.fps)
+          const pipeline = await createRegionPipeline(
+            stream,
+            startOptions.region,
+            startOptions.fps,
+            audioPipeline.track
+          )
           if (cancelledRef.current) {
             pipeline.stop()
             cleanupStreams()
@@ -335,6 +395,7 @@ export function useScreenRecorder(options: UseScreenRecorderOptions): ScreenReco
           size = { width: pipeline.width, height: pipeline.height }
         } else {
           size = await getStreamVideoSize(stream)
+          captureStream = composeCaptureStream(stream, audioPipeline.track)
         }
 
         if (size.width < 2 || size.height < 2) {
@@ -347,7 +408,8 @@ export function useScreenRecorder(options: UseScreenRecorderOptions): ScreenReco
           fps: startOptions.fps,
           quality: startOptions.quality,
           width: size.width,
-          height: size.height
+          height: size.height,
+          hasAudio: audioPipeline.hasAudio
         }
 
         dispatch({
@@ -422,6 +484,11 @@ export function useScreenRecorder(options: UseScreenRecorderOptions): ScreenReco
         recorder.start(1000)
         startedAtRef.current = performance.now()
         lastTickRef.current = performance.now()
+
+        setAudioLevel(audioPipeline.getLevel())
+        levelTimerRef.current = window.setInterval(() => {
+          setAudioLevel(audioPipelineRef.current?.getLevel() ?? 0)
+        }, 100)
 
         timerRef.current = window.setInterval(() => {
           const now = performance.now()
@@ -505,6 +572,11 @@ export function useScreenRecorder(options: UseScreenRecorderOptions): ScreenReco
       cancelledRef.current = true
       stopTimer()
 
+      if (levelTimerRef.current !== null) {
+        window.clearInterval(levelTimerRef.current)
+        levelTimerRef.current = null
+      }
+
       const recorder = recorderRef.current
       if (recorder) {
         recorder.ondataavailable = null
@@ -521,6 +593,8 @@ export function useScreenRecorder(options: UseScreenRecorderOptions): ScreenReco
 
       pipelineRef.current?.stop()
       pipelineRef.current = null
+      audioPipelineRef.current?.stop()
+      audioPipelineRef.current = null
       stopStream(streamRef.current)
       streamRef.current = null
 
@@ -535,6 +609,7 @@ export function useScreenRecorder(options: UseScreenRecorderOptions): ScreenReco
   return {
     state,
     preparing,
+    audioLevel,
     start,
     cancel,
     stop,

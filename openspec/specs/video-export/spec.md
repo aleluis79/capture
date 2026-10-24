@@ -69,13 +69,18 @@ La app DEBE ofrecer perfiles de calidad Alta, Media y Baja que se traduzcan en v
 
 ### Requirement: Exportación a MP4 H.264 compatible
 
-La app DEBE exportar un MP4 con códec H.264, formato de píxel 4:2:0, sin audio y con el índice al inicio para permitir la reproducción progresiva.
+La app DEBE exportar un MP4 con códec de vídeo H.264, formato de píxel 4:2:0, audio AAC cuando la grabación incluya sonido y el índice al inicio para permitir la reproducción progresiva.
 
 #### Scenario: Archivo reproducible
 
 - **WHEN** finaliza una exportación
 - **THEN** el archivo se reproduce en VLC, navegadores y reproductores del sistema
-- **AND** el contenedor es MP4 con pista de vídeo H.264 y sin pista de audio
+- **AND** el contenedor es MP4 con pista de vídeo H.264 y, cuando la grabación no incluye sonido, sin pista de audio
+
+#### Scenario: Archivo reproducible con audio
+
+- **WHEN** finaliza la exportación de una grabación con pista de audio
+- **THEN** el contenedor MP4 incluye la pista de vídeo H.264 y la pista de audio AAC sincronizada con el recorte
 
 #### Scenario: Nombre de archivo por defecto
 
@@ -126,3 +131,22 @@ La app DEBE traducir los fallos de exportación a mensajes en español con una a
 
 - **WHEN** el sistema informa de falta de espacio durante la exportación
 - **THEN** la app lo indica, limpia el archivo parcial y conserva la grabación original
+
+### Requirement: Normalización de sonoridad del audio exportado
+
+La app DEBE ofrecer una normalización de sonoridad activada por defecto que ajuste el nivel del audio del MP4 a un nivel audible y consistente, y DEBE permitir desactivarla.
+
+#### Scenario: Exportación con normalización activa
+
+- **WHEN** el usuario exporta una grabación con audio y la normalización está activada
+- **THEN** FFmpeg aplica `loudnorm` y el nivel medio del MP4 resultante es mayor que el de la misma exportación sin normalizar
+
+#### Scenario: Exportación con normalización desactivada
+
+- **WHEN** el usuario desactiva "Normalizar volumen al exportar"
+- **THEN** el MP4 conserva el nivel de audio original sin aplicar `loudnorm`
+
+#### Scenario: Grabación sin audio
+
+- **WHEN** la grabación no contiene pista de audio
+- **THEN** la exportación no aplica filtros de audio y el MP4 sigue sin pista de sonido

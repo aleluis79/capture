@@ -1,8 +1,34 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { CapturaApi } from '@shared/api'
 import type { HistoryEntry, PlatformInfo, Settings } from '@shared/types'
 import App from '@renderer/App'
+
+const captureMock = vi.hoisted(() => ({
+  acquireDisplayStream: vi.fn(),
+  acquireMicStream: vi.fn(),
+  composeCaptureStream: vi.fn((stream: MediaStream) => stream),
+  createAudioPipeline: vi.fn(
+    (): {
+      track: MediaStreamTrack | null
+      hasAudio: boolean
+      getLevel: () => number
+      stop: () => void
+    } => ({
+      track: null,
+      hasAudio: false,
+      getLevel: () => 0,
+      stop: vi.fn()
+    })
+  ),
+  createMediaRecorder: vi.fn(),
+  createRegionPipeline: vi.fn(),
+  getStreamVideoSize: vi.fn(),
+  listAudioInputs: vi.fn().mockResolvedValue([]),
+  stopStream: vi.fn()
+}))
+
+vi.mock('../../src/renderer/src/lib/capture', () => captureMock)
 
 const settings: Settings = {
   resolution: '1080p',
@@ -10,10 +36,16 @@ const settings: Settings = {
   customHeight: 1080,
   fps: 30,
   quality: 'medium',
-  countdownSeconds: 3,
+  countdownSeconds: 0,
   shortcut: 'Control+Alt+R',
   outputDir: '/home/alejandro/Vídeos/Capturas',
-  keepSource: true
+  keepSource: true,
+  systemAudio: false,
+  micAudio: false,
+  micDeviceId: 'default',
+  systemAudioGain: 1,
+  micGain: 1,
+  normalizeAudio: true
 }
 
 const waylandPlatform: PlatformInfo = {
@@ -21,7 +53,7 @@ const waylandPlatform: PlatformInfo = {
   sessionType: 'wayland',
   needsSystemPicker: true,
   cursorNotice: 'El cursor lo incluye el portal de pantalla del sistema.',
-  canEnableSystemAudio: false,
+  canEnableSystemAudio: true,
   appVersion: '0.1.0'
 }
 
@@ -55,9 +87,9 @@ function createApi(overrides: Partial<CapturaApi> = {}): CapturaApi {
     listSources: vi.fn().mockResolvedValue([]),
     setPendingSource: vi.fn().mockResolvedValue(undefined),
     startRecording: vi.fn(),
-    appendChunk: vi.fn(),
+    appendChunk: vi.fn().mockResolvedValue(undefined),
     finishRecording: vi.fn(),
-    abortRecording: vi.fn(),
+    abortRecording: vi.fn().mockResolvedValue(undefined),
     listHistory: vi.fn().mockResolvedValue([]),
     removeRecording: vi.fn().mockResolvedValue([]),
     openEntryFolder: vi.fn(),
@@ -86,8 +118,26 @@ function createApi(overrides: Partial<CapturaApi> = {}): CapturaApi {
   return { ...api, ...overrides }
 }
 
+function createDisplayHarness(): { stream: MediaStream; track: Record<string, unknown> } {
+  const track = {
+    getSettings: () => ({ width: 1280, height: 720 }),
+    applyConstraints: vi.fn().mockResolvedValue(undefined),
+    addEventListener: vi.fn(),
+    stop: vi.fn()
+  }
+
+  const stream = {
+    getVideoTracks: () => [track],
+    getAudioTracks: () => [],
+    getTracks: () => [track]
+  } as unknown as MediaStream
+
+  return { stream, track }
+}
+
 beforeEach(() => {
   window.api = createApi()
+  captureMock.listAudioInputs.mockResolvedValue([])
 })
 
 afterEach(() => {
@@ -163,5 +213,99 @@ describe('App', () => {
 
     fireEvent.click(screen.getByText('Reexportar'))
     expect(await screen.findByText('Revisa y exporta')).toBeInTheDocument()
+  })
+
+  it('carga los micrófonos y los ofrece al activar la captura de voz', async () => {
+    captureMock.listAudioInputs.mockResolvedValue([
+      { deviceId: 'mic-1', label: 'Micrófono USB' },
+      { deviceId: 'mic-2', label: 'Auriculares' }
+    ])
+
+    render(<App />)
+    await screen.findByRole('heading', { name: 'Captura' })
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Micrófono' }))
+
+    expect(window.api.updateSettings).toHaveBeenCalledWith({ micAudio: true })
+    expect(await screen.findByRole('option', { name: 'Micrófono USB' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Auriculares' })).toBeInTheDocument()
+  })
+
+  it('pasa los ajustes de audio al iniciar la grabación', async () => {
+    const harness = createDisplayHarness()
+    const audioTrack = { kind: 'audio', stop: vi.fn() } as unknown as MediaStreamTrack
+
+    const recorder = {
+      state: 'inactive' as 'inactive' | 'recording',
+      ondataavailable: null,
+      onstop: null,
+      onerror: null,
+      start: vi.fn(() => {
+        recorder.state = 'recording'
+      }),
+      stop: vi.fn()
+    }
+
+    captureMock.acquireDisplayStream.mockResolvedValue(harness.stream)
+    captureMock.acquireMicStream.mockResolvedValue(harness.stream)
+    captureMock.createAudioPipeline.mockReturnValue({
+      track: audioTrack,
+      hasAudio: true,
+      getLevel: () => 0.5,
+      stop: vi.fn()
+    })
+    captureMock.getStreamVideoSize.mockResolvedValue({ width: 1280, height: 720 })
+    captureMock.createMediaRecorder.mockReturnValue(recorder)
+
+    window.api = createApi({
+      getSettings: vi.fn().mockResolvedValue({
+        ...settings,
+        systemAudio: true,
+        micAudio: true,
+        micDeviceId: 'mic-1',
+        systemAudioGain: 2,
+        micGain: 1.5
+      }),
+      getPlatformInfo: vi.fn().mockResolvedValue(x11Platform),
+      listSources: vi.fn().mockResolvedValue([
+        {
+          id: 'screen:0:0',
+          name: 'Pantalla 1',
+          kind: 'screen',
+          thumbnail: 'data:image/png;base64,AA==',
+          displayId: '0'
+        }
+      ]),
+      startRecording: vi.fn().mockResolvedValue({ sessionId: 'sesion-audio' }),
+      finishRecording: vi.fn().mockResolvedValue(entry),
+      hideWindow: vi.fn().mockResolvedValue(undefined),
+      showWindow: vi.fn().mockResolvedValue(undefined)
+    })
+
+    render(<App />)
+    await screen.findByRole('heading', { name: 'Captura' })
+    await waitFor(() =>
+      expect(window.api.setPendingSource).toHaveBeenCalledWith('screen:0:0')
+    )
+
+    const recordButtons = screen.getAllByRole('button', { name: /^Grabar$/ })
+    fireEvent.click(recordButtons[recordButtons.length - 1])
+
+    await waitFor(() => expect(captureMock.acquireMicStream).toHaveBeenCalledWith('mic-1'))
+    expect(captureMock.acquireDisplayStream).toHaveBeenCalledWith(30, true)
+    expect(captureMock.createAudioPipeline).toHaveBeenCalledWith(
+      expect.objectContaining({ systemAudioGain: 2, micGain: 1.5 })
+    )
+    await waitFor(() =>
+      expect(window.api.startRecording).toHaveBeenCalledWith(
+        expect.objectContaining({ mode: 'screen', fps: 30 })
+      )
+    )
+    await waitFor(() =>
+      expect(screen.getByRole('meter', { name: 'Nivel de audio' })).toHaveAttribute(
+        'aria-valuenow',
+        '50'
+      )
+    )
   })
 })

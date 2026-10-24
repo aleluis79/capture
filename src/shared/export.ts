@@ -10,6 +10,8 @@ export interface ExportArgsInput {
   height: number
   fps: number
   quality: QualityPreset
+  includeAudio?: boolean
+  normalizeAudio?: boolean
 }
 
 export function buildPartPath(outputPath: string): string {
@@ -38,7 +40,18 @@ export function buildVideoFilter(width: number, height: number, fps: number): st
 }
 
 export function buildExportArgs(input: ExportArgsInput): string[] {
-  const { inputPath, outputPath, startMs, endMs, width, height, fps, quality } = input
+  const {
+    inputPath,
+    outputPath,
+    startMs,
+    endMs,
+    width,
+    height,
+    fps,
+    quality,
+    includeAudio = true,
+    normalizeAudio = true
+  } = input
 
   if (!Number.isFinite(width) || !Number.isFinite(height) || width < 2 || height < 2) {
     throw new Error('La resolución de salida no es válida')
@@ -88,11 +101,20 @@ export function buildExportArgs(input: ExportArgsInput): string[] {
     '-pix_fmt',
     'yuv420p',
     '-movflags',
-    '+faststart',
-    '-an',
-    '-y',
-    buildPartPath(outputPath)
+    '+faststart'
   )
+
+  if (includeAudio) {
+    args.push('-map', '0:v:0', '-map', '0:a:0?')
+    if (normalizeAudio) {
+      args.push('-af', 'loudnorm=I=-16:TP=-1.5:LRA=11')
+    }
+    args.push('-c:a', 'aac', '-b:a', '128k')
+  } else {
+    args.push('-an')
+  }
+
+  args.push('-y', buildPartPath(outputPath))
 
   return args
 }

@@ -1,9 +1,11 @@
-import type { ResolutionPreset, Settings } from '@shared/types'
+import type { AudioInputDevice, ResolutionPreset, Settings } from '@shared/types'
 import { t } from '../i18n/es'
 
 interface SettingsPanelProps {
   settings: Settings
   cursorNotice: string
+  audioInputs?: AudioInputDevice[]
+  canEnableSystemAudio?: boolean
   disabled?: boolean
   onChange: (patch: Partial<Settings>) => void
 }
@@ -22,9 +24,15 @@ const FPS_OPTIONS = [15, 24, 30, 60]
 export function SettingsPanel({
   settings,
   cursorNotice,
+  audioInputs = [],
+  canEnableSystemAudio = true,
   disabled = false,
   onChange
 }: SettingsPanelProps) {
+  const systemAudioTitle = canEnableSystemAudio
+    ? t.settings.systemAudioNotice
+    : t.settings.systemAudioUnavailable
+
   return (
     <section className="panel capture-settings">
       <div className="settings-grid">
@@ -107,9 +115,113 @@ export function SettingsPanel({
           <span>{t.settings.cursor}</span>
         </div>
 
+        <label className="field checkbox-field" title={systemAudioTitle}>
+          <input
+            type="checkbox"
+            checked={settings.systemAudio}
+            disabled={disabled || !canEnableSystemAudio}
+            onChange={(event) => onChange({ systemAudio: event.target.checked })}
+          />
+          <span>{t.settings.systemAudio}</span>
+        </label>
+
+        <label className="field checkbox-field" title={t.settings.micNotice}>
+          <input
+            type="checkbox"
+            checked={settings.micAudio}
+            disabled={disabled}
+            onChange={(event) => onChange({ micAudio: event.target.checked })}
+          />
+          <span>{t.settings.micAudio}</span>
+        </label>
+
+        {settings.micAudio && (
+          <label className="field">
+            <span>{t.settings.micDevice}</span>
+            <select
+              value={settings.micDeviceId}
+              disabled={disabled}
+              onChange={(event) => onChange({ micDeviceId: event.target.value })}
+            >
+              <option value="default">{t.settings.micDefault}</option>
+              {audioInputs.map((device) => (
+                <option key={device.deviceId} value={device.deviceId}>
+                  {device.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+
+        {settings.systemAudio && (
+          <label className="field">
+            <span>{t.settings.systemAudioGain}</span>
+            <div className="fps-row">
+              <input
+                type="range"
+                min={0.5}
+                max={4}
+                step={0.1}
+                value={settings.systemAudioGain}
+                disabled={disabled}
+                aria-label={t.settings.systemAudioGain}
+                onChange={(event) => {
+                  const value = Number(event.target.value)
+                  if (Number.isFinite(value)) {
+                    onChange({ systemAudioGain: Math.round(value * 10) / 10 })
+                  }
+                }}
+              />
+              <strong>×{settings.systemAudioGain.toLocaleString('es-ES')}</strong>
+            </div>
+          </label>
+        )}
+
+        {settings.micAudio && (
+          <label className="field">
+            <span>{t.settings.micGain}</span>
+            <div className="fps-row">
+              <input
+                type="range"
+                min={0.5}
+                max={4}
+                step={0.1}
+                value={settings.micGain}
+                disabled={disabled}
+                aria-label={t.settings.micGain}
+                onChange={(event) => {
+                  const value = Number(event.target.value)
+                  if (Number.isFinite(value)) {
+                    onChange({ micGain: Math.round(value * 10) / 10 })
+                  }
+                }}
+              />
+              <strong>×{settings.micGain.toLocaleString('es-ES')}</strong>
+            </div>
+          </label>
+        )}
+
+        <label className="field checkbox-field" title={t.settings.normalizeAudioNotice}>
+          <input
+            type="checkbox"
+            checked={settings.normalizeAudio}
+            disabled={disabled}
+            onChange={(event) => onChange({ normalizeAudio: event.target.checked })}
+          />
+          <span>{t.settings.normalizeAudio}</span>
+        </label>
+
         <div className="field audio-badge">
           <span className="badge">{t.settings.audio}</span>
-          <small>{t.settings.audioNotice}</small>
+          <small>
+            {settings.systemAudio && settings.micAudio
+              ? t.settings.audioMixed
+              : settings.systemAudio
+                ? t.settings.audioSystem
+                : settings.micAudio
+                  ? t.settings.audioMic
+                  : t.settings.audioNotice}
+          </small>
         </div>
       </div>
 

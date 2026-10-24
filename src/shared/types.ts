@@ -23,6 +23,11 @@ export interface Point {
   y: number
 }
 
+export interface AudioInputDevice {
+  deviceId: string
+  label: string
+}
+
 export interface Settings {
   resolution: ResolutionPreset
   customWidth: number
@@ -33,6 +38,12 @@ export interface Settings {
   shortcut: string
   outputDir: string
   keepSource: boolean
+  systemAudio: boolean
+  micAudio: boolean
+  micDeviceId: string
+  systemAudioGain: number
+  micGain: number
+  normalizeAudio: boolean
 }
 
 export interface SourceInfo {
@@ -63,6 +74,7 @@ export interface RecorderFinishRequest {
   height: number
   fps: number
   mode: RecordingMode
+  hasAudio?: boolean
 }
 
 export interface ExportedFile {
@@ -82,6 +94,7 @@ export interface HistoryEntry {
   height: number
   fps: number
   mode: RecordingMode
+  hasAudio?: boolean
   sourcePath: string
   thumbPath: string | null
   exports: ExportedFile[]

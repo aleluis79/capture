@@ -38,7 +38,7 @@ describe('buildExportArgs', () => {
     )
   })
 
-  it('incluye códec H.264, CRF, faststart y sin audio', () => {
+  it('incluye códec H.264, CRF, faststart y codificación de audio AAC opcional por defecto', () => {
     const args = buildExportArgs(baseInput)
 
     expect(args).toContain('-c:v')
@@ -46,9 +46,42 @@ describe('buildExportArgs', () => {
     expect(args).toContain('-crf')
     expect(args[args.indexOf('-crf') + 1]).toBe('21')
     expect(args).toContain('+faststart')
-    expect(args).toContain('-an')
+    expect(args).toContain('0:v:0')
+    expect(args).toContain('0:a:0?')
+    expect(args).toContain('-c:a')
+    expect(args[args.indexOf('-c:a') + 1]).toBe('aac')
+    expect(args).toContain('-b:a')
+    expect(args[args.indexOf('-b:a') + 1]).toBe('128k')
+    expect(args).not.toContain('-an')
     expect(args).toContain('-pix_fmt')
     expect(args[args.indexOf('-pix_fmt') + 1]).toBe('yuv420p')
+  })
+
+  it('permite silenciar explícitamente la salida con includeAudio: false', () => {
+    const args = buildExportArgs({ ...baseInput, includeAudio: false })
+
+    expect(args).toContain('-an')
+    expect(args).not.toContain('-c:a')
+  })
+
+  it('aplica loudnorm cuando la normalización está activa', () => {
+    const args = buildExportArgs({ ...baseInput, normalizeAudio: true })
+
+    expect(args).toContain('-af')
+    expect(args[args.indexOf('-af') + 1]).toBe('loudnorm=I=-16:TP=-1.5:LRA=11')
+  })
+
+  it('omite loudnorm cuando la normalización está desactivada', () => {
+    const args = buildExportArgs({ ...baseInput, normalizeAudio: false })
+
+    expect(args).not.toContain('-af')
+  })
+
+  it('omite el filtro de audio cuando no hay pista de sonido', () => {
+    const args = buildExportArgs({ ...baseInput, includeAudio: false, normalizeAudio: true })
+
+    expect(args).not.toContain('-af')
+    expect(args).toContain('-an')
   })
 
   it('escribe en un archivo .part y sobrescribe sin preguntar', () => {

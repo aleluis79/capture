@@ -10,7 +10,8 @@ import type {
   ShortcutState,
   SourceInfo
 } from '@shared/types'
-import { acquireDisplayStream, stopStream } from './lib/capture'
+import { acquireDisplayStream, listAudioInputs, stopStream } from './lib/capture'
+import type { AudioInputDevice } from '@shared/types'
 import { useScreenRecorder } from './hooks/useScreenRecorder'
 import { ModeSelector } from './components/ModeSelector'
 import { SourcePicker } from './components/SourcePicker'
@@ -60,6 +61,7 @@ export default function App(): React.JSX.Element {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [shortcut, setShortcut] = useState<ShortcutState | null>(null)
   const [cleanupBusy, setCleanupBusy] = useState(false)
+  const [audioInputs, setAudioInputs] = useState<AudioInputDevice[]>([])
 
   const regionStreamRef = useRef<MediaStream | null>(null)
   const exportIdRef = useRef<string | null>(null)
@@ -187,6 +189,20 @@ export default function App(): React.JSX.Element {
       void window.api.setPendingSource(only.id)
     }
   }, [filteredSources, platformInfo, sourceId])
+
+  useEffect(() => {
+    let alive = true
+
+    void listAudioInputs().then((devices) => {
+      if (alive) {
+        setAudioInputs(devices)
+      }
+    })
+
+    return () => {
+      alive = false
+    }
+  }, [settings?.micAudio])
 
   useEffect(() => {
     return window.api.onExportProgress((progress) => {
@@ -334,6 +350,13 @@ export default function App(): React.JSX.Element {
     }
 
     const currentMode = recorder.state.mode
+    const audioOptions = {
+      systemAudio: settings.systemAudio,
+      micAudio: settings.micAudio,
+      micDeviceId: settings.micDeviceId,
+      systemAudioGain: settings.systemAudioGain,
+      micGain: settings.micGain
+    }
 
     if (currentMode === 'region') {
       if (!region || !regionStreamRef.current) {
@@ -348,7 +371,8 @@ export default function App(): React.JSX.Element {
         stream,
         fps: settings.fps,
         quality: settings.quality,
-        countdownSeconds: settings.countdownSeconds
+        countdownSeconds: settings.countdownSeconds,
+        ...audioOptions
       })
       return
     }
@@ -366,7 +390,8 @@ export default function App(): React.JSX.Element {
       region: null,
       fps: settings.fps,
       quality: settings.quality,
-      countdownSeconds: settings.countdownSeconds
+      countdownSeconds: settings.countdownSeconds,
+      ...audioOptions
     })
   }
 
@@ -625,6 +650,22 @@ export default function App(): React.JSX.Element {
                     <span className="rec-dot" aria-hidden="true" />
                     <span>{t.capture.recording}</span>
                     <strong className="timer">{formatDuration(recorder.state.elapsedMs)}</strong>
+                    {(settings.systemAudio || settings.micAudio) && (
+                      <div
+                        className="audio-meter"
+                        role="meter"
+                        aria-label={t.capture.audioLevel}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-valuenow={Math.round(recorder.audioLevel * 100)}
+                        title={t.capture.audioLevelHint}
+                      >
+                        <div
+                          className="audio-meter-fill"
+                          style={{ width: `${Math.round(recorder.audioLevel * 100)}%` }}
+                        />
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -642,6 +683,8 @@ export default function App(): React.JSX.Element {
               <SettingsPanel
                 settings={settings}
                 cursorNotice={platformInfo.cursorNotice}
+                audioInputs={audioInputs}
+                canEnableSystemAudio={platformInfo.canEnableSystemAudio}
                 disabled={busy}
                 onChange={(patch) => void updateSettings(patch)}
               />

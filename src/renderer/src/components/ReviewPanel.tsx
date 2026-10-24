@@ -96,6 +96,7 @@ export function ReviewPanel({
             <p className="muted">
               {formatDate(entry.createdAt)} · {formatDuration(entry.durationMs)} ·{' '}
               {formatBytes(entry.sizeBytes)}
+              {entry.hasAudio ? ` · ${t.history.audio}` : ''}
             </p>
           </div>
           <button type="button" className="btn ghost small" onClick={onNewRecording}>

@@ -74,6 +74,7 @@ export function sanitizeHistory(input: unknown): HistoryEntry[] {
 
   const valid = input.filter(isHistoryEntry).map((entry) => ({
     ...entry,
+    hasAudio: entry.hasAudio === true,
     exports: sanitizeExports(entry.exports)
   }))
 

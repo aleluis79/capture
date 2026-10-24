@@ -7,11 +7,20 @@ import { FFMPEG_PATH, createTestWebm } from '../helpers/media'
 
 let workDir: string
 let sourcePath: string
+let audioSourcePath: string
 
 beforeAll(() => {
   workDir = mkdtempSync(join(tmpdir(), 'captura-ffmpeg-'))
   sourcePath = join(workDir, 'source.webm')
+  audioSourcePath = join(workDir, 'source-audio.webm')
   createTestWebm(sourcePath, { durationSec: 2, width: 640, height: 360, fps: 30 })
+  createTestWebm(audioSourcePath, {
+    durationSec: 2,
+    width: 640,
+    height: 360,
+    fps: 30,
+    withAudio: true
+  })
 })
 
 afterAll(() => {
@@ -89,15 +98,23 @@ describe('resolveFfmpegPath', () => {
 })
 
 describe('probeMedia', () => {
-  it('lee duración, resolución y FPS del archivo intermedio', async () => {
+  it('lee duración, resolución, FPS y ausencia de audio del archivo intermedio', async () => {
     const info = await probeMedia(FFMPEG_PATH, sourcePath)
 
     expect(info).not.toBeNull()
     expect(info?.width).toBe(640)
     expect(info?.height).toBe(360)
     expect(info?.fps).toBe(30)
+    expect(info?.hasAudio).toBe(false)
     expect(info?.durationMs).toBeGreaterThan(1_800)
     expect(info?.durationMs).toBeLessThan(2_300)
+  })
+
+  it('detecta cuando el archivo intermedio contiene pista de audio', async () => {
+    const info = await probeMedia(FFMPEG_PATH, audioSourcePath)
+
+    expect(info).not.toBeNull()
+    expect(info?.hasAudio).toBe(true)
   })
 
   it('devuelve null si el archivo no existe', async () => {

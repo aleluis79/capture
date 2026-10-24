@@ -115,6 +115,7 @@ export function HistoryPanel({
                 </div>
                 <div className="history-badges">
                   <span className={`badge badge-${entry.mode}`}>{t.modes[entry.mode]}</span>
+                  {entry.hasAudio && <span className="badge">{t.history.audio}</span>}
                   {entry.status === 'recovered' && (
                     <span className="badge badge-warning">{t.history.recovered}</span>
                   )}

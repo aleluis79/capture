@@ -28,6 +28,7 @@ export interface MediaProbe {
   width: number
   height: number
   fps: number
+  hasAudio: boolean
 }
 
 function runCapture(
@@ -62,9 +63,9 @@ export async function probeMedia(ffmpegPath: string, filePath: string): Promise<
   }
 
   const durationMatch = /Duration:\s(\d+):(\d+):(\d+(?:\.\d+)?)/.exec(stderr)
-  const videoLine = stderr
-    .split('\n')
-    .find((line) => line.includes('Stream #') && line.includes('Video:'))
+  const lines = stderr.split('\n')
+  const videoLine = lines.find((line) => line.includes('Stream #') && line.includes('Video:'))
+  const hasAudio = lines.some((line) => line.includes('Stream #') && line.includes('Audio:'))
 
   if (!durationMatch || !videoLine) {
     return null
@@ -84,7 +85,8 @@ export async function probeMedia(ffmpegPath: string, filePath: string): Promise<
     durationMs: Math.round(durationMs),
     width: Number(dimensions[1]),
     height: Number(dimensions[2]),
-    fps: fpsMatch ? Math.round(Number(fpsMatch[1])) : 0
+    fps: fpsMatch ? Math.round(Number(fpsMatch[1])) : 0,
+    hasAudio
   }
 }
 

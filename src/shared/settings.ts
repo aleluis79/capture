@@ -82,12 +82,22 @@ export function createDefaultSettings(defaultOutputDir: string): Settings {
     countdownSeconds: 3,
     shortcut: 'Control+Alt+R',
     outputDir: defaultOutputDir,
-    keepSource: true
+    keepSource: true,
+    systemAudio: false,
+    micAudio: false,
+    micDeviceId: 'default',
+    systemAudioGain: 1,
+    micGain: 1,
+    normalizeAudio: true
   }
 }
 
 function isIntegerInRange(value: unknown, min: number, max: number): value is number {
   return typeof value === 'number' && Number.isInteger(value) && value >= min && value <= max
+}
+
+function isGainInRange(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0.5 && value <= 4
 }
 
 export function sanitizeSettings(input: unknown, defaults: Settings): Settings {
@@ -114,6 +124,11 @@ export function sanitizeSettings(input: unknown, defaults: Settings): Settings {
       ? candidate.shortcut
       : defaults.shortcut
 
+  const micDeviceId =
+    typeof candidate.micDeviceId === 'string' && candidate.micDeviceId.trim().length > 0
+      ? candidate.micDeviceId.trim()
+      : defaults.micDeviceId
+
   return {
     resolution,
     customWidth: isIntegerInRange(candidate.customWidth, 2, 7680)
@@ -130,7 +145,19 @@ export function sanitizeSettings(input: unknown, defaults: Settings): Settings {
     shortcut,
     outputDir,
     keepSource:
-      typeof candidate.keepSource === 'boolean' ? candidate.keepSource : defaults.keepSource
+      typeof candidate.keepSource === 'boolean' ? candidate.keepSource : defaults.keepSource,
+    systemAudio:
+      typeof candidate.systemAudio === 'boolean' ? candidate.systemAudio : defaults.systemAudio,
+    micAudio: typeof candidate.micAudio === 'boolean' ? candidate.micAudio : defaults.micAudio,
+    micDeviceId,
+    systemAudioGain: isGainInRange(candidate.systemAudioGain)
+      ? candidate.systemAudioGain
+      : defaults.systemAudioGain,
+    micGain: isGainInRange(candidate.micGain) ? candidate.micGain : defaults.micGain,
+    normalizeAudio:
+      typeof candidate.normalizeAudio === 'boolean'
+        ? candidate.normalizeAudio
+        : defaults.normalizeAudio
   }
 }
 

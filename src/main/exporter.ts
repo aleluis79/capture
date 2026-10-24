@@ -30,6 +30,7 @@ export interface ExportRequest {
   height: number
   fps: number
   quality: QualityPreset
+  normalizeAudio?: boolean
 }
 
 export interface ExportCallbacks {

@@ -14,6 +14,8 @@ La app DEBE arrancar con valores por defecto sensatos cuando no existan ajustes 
 
 - **WHEN** el usuario abre la app por primera vez
 - **THEN** la resolución de salida es 1080p, los FPS son 30, la calidad es Media y la cuenta atrás está activada con 3 s
+- **AND** el audio del sistema y el micrófono están desactivados con el dispositivo de micrófono en `default`
+- **AND** la ganancia del sistema y del micrófono es 1× y la normalización al exportar está activada
 - **AND** el atajo global propuesto es Ctrl+Alt+R
 - **AND** la carpeta de destino es la carpeta de vídeos del usuario con subcarpeta `Capturas`
 
@@ -31,6 +33,12 @@ La app DEBE guardar los ajustes en disco y DEBE ignorar valores desconocidos o i
 - **WHEN** el archivo de ajustes no se puede leer o contiene valores inválidos
 - **THEN** la app arranca con los valores por defecto
 - **AND** conserva una copia del archivo corrupto para diagnóstico
+
+#### Scenario: Ganancia persistente y validada
+
+- **WHEN** el usuario ajusta la ganancia del sistema a 2,5× y reinicia la app
+- **THEN** la ganancia sigue siendo 2,5×
+- **AND** un valor de ganancia no numérico o fuera de 0,5×–4× vuelve al valor por defecto
 
 ### Requirement: Carpeta de destino configurable
 
@@ -64,18 +72,20 @@ La app DEBE permitir cambiar el atajo global y DEBE informar cuando el sistema n
 
 ### Requirement: Información de plataforma
 
-La app DEBE detectar la plataforma y el servidor gráfico para mostrar instrucciones adecuadas sobre la selección de fuentes y el cursor.
+La app DEBE detectar la plataforma y el servidor gráfico para mostrar instrucciones adecuadas sobre la selección de fuentes, el soporte de audio del sistema y el cursor.
 
 #### Scenario: Sesión Wayland
 
 - **WHEN** la app se ejecuta en una sesión Wayland
 - **THEN** indica que la fuente se elige mediante el diálogo del sistema
 - **AND** no intenta mostrar una galería de ventanas que el portal no permite enumerar
+- **AND** informa si la captura de audio del sistema está disponible en la plataforma actual
 
 #### Scenario: Sesión Windows o X11
 
 - **WHEN** la app se ejecuta en Windows o en una sesión X11
 - **THEN** permite elegir la fuente desde la galería interna de la app
+- **AND** habilita la opción de audio del sistema cuando el entorno la soporta
 
 ### Requirement: Idioma de la interfaz
 

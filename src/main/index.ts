@@ -178,7 +178,23 @@ function registerProtocol(): void {
 
 function registerDisplayMediaHandler(): void {
   session.defaultSession.setDisplayMediaRequestHandler(
-    async (_request, callback) => {
+    async (request, callback) => {
+      const respondWithSource = (source: Electron.DesktopCapturerSource | undefined): void => {
+        if (!source) {
+          callback(null)
+          return
+        }
+        if (request.audioRequested) {
+          try {
+            callback({ video: source, audio: 'loopback' })
+            return
+          } catch {
+            // Si loopback no está soportado, continuamos solo con vídeo.
+          }
+        }
+        callback({ video: source })
+      }
+
       try {
         if (pendingSourceId) {
           const requested = pendingSourceId
@@ -188,7 +204,7 @@ function registerDisplayMediaHandler(): void {
             thumbnailSize: { width: 0, height: 0 }
           })
           const source = sources.find((candidate) => candidate.id === requested)
-          callback(source ? { video: source } : null)
+          respondWithSource(source)
           return
         }
 
@@ -197,7 +213,7 @@ function registerDisplayMediaHandler(): void {
             types: ['screen', 'window'],
             thumbnailSize: { width: 0, height: 0 }
           })
-          callback(sources[0] ? { video: sources[0] } : null)
+          respondWithSource(sources[0])
           return
         }
 
@@ -314,6 +330,7 @@ function registerIpc(): void {
         height,
         fps: request.fps,
         mode: request.mode,
+        hasAudio: request.hasAudio === true,
         sourcePath: finished.sourcePath,
         thumbPath: thumbnailReady ? thumbPath : null,
         exports: [],
@@ -390,7 +407,8 @@ function registerIpc(): void {
       width: probe?.width ?? 0,
       height: probe?.height ?? 0,
       fps: probe?.fps || 30,
-      mode: 'screen'
+      mode: 'screen',
+      hasAudio: probe?.hasAudio ?? false
     })
   })
 
@@ -455,7 +473,8 @@ function registerIpc(): void {
             width: request.options.width,
             height: request.options.height,
             fps: request.options.fps,
-            quality: request.options.quality
+            quality: request.options.quality,
+            normalizeAudio: settingsStore.get().normalizeAudio
           },
           {
             onProgress: (percent) => {

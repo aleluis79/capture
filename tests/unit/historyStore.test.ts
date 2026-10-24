@@ -124,7 +124,7 @@ describe('HistoryStore', () => {
     expect(existsSync(orphanDir)).toBe(false)
   })
 
-  it('recupera una huérfana como entrada del historial', () => {
+  it('recupera una huérfana como entrada del historial con su estado de audio', () => {
     const orphanDir = join(dataDir, 'recordings', 'huerfana')
     mkdirSync(orphanDir, { recursive: true })
     writeFileSync(join(orphanDir, 'source.webm'), 'datos')
@@ -134,11 +134,14 @@ describe('HistoryStore', () => {
       width: 1280,
       height: 720,
       fps: 30,
-      mode: 'screen'
+      mode: 'screen',
+      hasAudio: true
     })
 
     expect(entry.status).toBe('recovered')
+    expect(entry.hasAudio).toBe(true)
     expect(store.find('huerfana')?.durationMs).toBe(5000)
+    expect(store.find('huerfana')?.hasAudio).toBe(true)
   })
 
   it('limpia solo los archivos intermedios ya exportados', () => {

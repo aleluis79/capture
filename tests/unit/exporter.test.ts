@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { ExportError, Exporter } from '@main/exporter'
-import { FFMPEG_PATH, createTestWebm, probeMedia } from '../helpers/media'
+import { FFMPEG_PATH, createTestWebm, measureMeanVolume, probeMedia } from '../helpers/media'
 
 let workDir: string
 let sourcePath: string
@@ -61,6 +61,59 @@ describe('Exporter', () => {
     expect(info.durationMs).toBeGreaterThan(2_500)
     expect(info.durationMs).toBeLessThan(3_500)
     expect(onProgress.some((percent) => percent > 0)).toBe(true)
+  })
+
+  it('conserva la pista de audio en AAC cuando el archivo intermedio tiene sonido', async () => {
+    const audioSource = join(workDir, 'source-with-audio.webm')
+    createTestWebm(audioSource, {
+      durationSec: 2,
+      width: 640,
+      height: 360,
+      fps: 30,
+      withAudio: true
+    })
+
+    const exporter = new Exporter(FFMPEG_PATH)
+    const options = request({ inputPath: audioSource, endMs: 2000 })
+    await exporter.run(options)
+
+    const info = probeMedia(options.outputPath)
+    expect(info.videoCodec).toBe('h264')
+    expect(info.hasAudio).toBe(true)
+  })
+
+  it('sube el nivel del audio con la normalización activa', async () => {
+    const quietSource = join(workDir, 'quiet.webm')
+    createTestWebm(quietSource, {
+      durationSec: 2,
+      width: 640,
+      height: 360,
+      fps: 30,
+      withAudio: true,
+      audioVolume: 0.05
+    })
+
+    const exporter = new Exporter(FFMPEG_PATH)
+    const plain = request({
+      inputPath: quietSource,
+      outputPath: join(workDir, 'plain.mp4'),
+      endMs: 2000,
+      normalizeAudio: false
+    })
+    await exporter.run(plain)
+
+    const normalized = request({
+      inputPath: quietSource,
+      outputPath: join(workDir, 'normalized.mp4'),
+      endMs: 2000,
+      normalizeAudio: true
+    })
+    await exporter.run(normalized)
+
+    const plainLevel = measureMeanVolume(plain.outputPath)
+    const normalizedLevel = measureMeanVolume(normalized.outputPath)
+
+    expect(normalizedLevel).toBeGreaterThan(plainLevel + 3)
   })
 
   it('aplica el recorte de inicio y fin', async () => {

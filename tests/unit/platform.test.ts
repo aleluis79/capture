@@ -82,18 +82,25 @@ describe('cursorNotice', () => {
 })
 
 describe('buildPlatformInfo', () => {
-  it('marca la necesidad del selector del sistema en Wayland', () => {
+  it('marca la necesidad del selector del sistema en Wayland y habilita audio del sistema', () => {
     const info = buildPlatformInfo('linux', 'wayland', '0.1.0')
     expect(info).toMatchObject({
       platform: 'linux',
       sessionType: 'wayland',
       needsSystemPicker: true,
-      canEnableSystemAudio: false,
+      canEnableSystemAudio: true,
       appVersion: '0.1.0'
     })
   })
 
-  it('no exige selector del sistema en Windows', () => {
-    expect(buildPlatformInfo('win32', 'windows', '0.1.0').needsSystemPicker).toBe(false)
+  it('no exige selector del sistema en Windows y habilita audio del sistema', () => {
+    const info = buildPlatformInfo('win32', 'windows', '0.1.0')
+    expect(info.needsSystemPicker).toBe(false)
+    expect(info.canEnableSystemAudio).toBe(true)
+  })
+
+  it('habilita audio del sistema en X11 y lo desactiva en unknown', () => {
+    expect(buildPlatformInfo('linux', 'x11', '0.1.0').canEnableSystemAudio).toBe(true)
+    expect(buildPlatformInfo('linux', 'unknown', '0.1.0').canEnableSystemAudio).toBe(false)
   })
 })

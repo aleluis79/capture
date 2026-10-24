@@ -69,6 +69,8 @@ export const t = {
       'La resolución y los FPS se aplican al MP4 exportado; la captura se hace a resolución nativa.',
     preparing: 'Preparando captura…',
     recording: 'Grabando',
+    audioLevel: 'Nivel de audio',
+    audioLevelHint: 'El medidor refleja el audio que se está grabando.',
     startingIn: 'La grabación empezará en',
     countdownHint: 'Puedes cancelar con Escape.'
   },
@@ -87,8 +89,24 @@ export const t = {
     cursor: 'Mostrar cursor',
     cursorNotice:
       'El cursor lo incluye el sistema al capturar; no se puede desactivar desde la aplicación.',
-    audio: 'Sin audio',
-    audioNotice: 'Esta versión graba solo imagen. El audio llegará más adelante.',
+    systemAudio: 'Audio del sistema',
+    systemAudioNotice: 'Incluye el sonido que reproduce el equipo.',
+    systemAudioUnavailable: 'La captura de audio del sistema no está disponible en este entorno.',
+    micAudio: 'Micrófono',
+    micDevice: 'Dispositivo de entrada',
+    micDefault: 'Predeterminado del sistema',
+    micNotice: 'Graba tu voz desde el micrófono seleccionado.',
+    micNoDevices: 'No se detectaron micrófonos.',
+    systemAudioGain: 'Volumen del sistema',
+    micGain: 'Volumen del micrófono',
+    normalizeAudio: 'Normalizar volumen al exportar',
+    normalizeAudioNotice: 'Ajusta el nivel del audio del MP4 a un volumen audible y consistente.',
+    audio: 'Audio',
+    audioNone: 'Sin audio',
+    audioNotice: 'Activa el audio del sistema, el micrófono o ambos para grabar sonido.',
+    audioMixed: 'Sistema y micrófono',
+    audioSystem: 'Solo sistema',
+    audioMic: 'Solo micrófono',
     native: 'Nativa',
     custom: 'Personalizada',
     folder: 'Carpeta de grabaciones',
@@ -133,7 +151,8 @@ export const t = {
     cleanupConfirmBody: 'Los MP4 exportados no se borrarán.',
     orphansTitle: 'Grabaciones interrumpidas',
     orphansBody: 'Encontramos archivos de una sesión anterior. Puedes recuperarlos o descartarlos.',
-    recovered: 'recuperada'
+    recovered: 'recuperada',
+    audio: 'Con audio'
   },
   errors: {
     generic: 'Se produjo un error inesperado.',
@@ -149,6 +168,8 @@ export const t = {
     exportFailed: 'No se pudo exportar el vídeo.',
     exportCancelled: 'Exportación cancelada.',
     sourceEnded: 'La fuente dejó de estar disponible. Se conservará lo grabado.',
+    micPermission: 'No se concedió permiso para usar el micrófono.',
+    micUnavailable: 'No se pudo acceder al micrófono seleccionado.',
     settingsSave: 'No se pudieron guardar los ajustes.'
   },
   common: {

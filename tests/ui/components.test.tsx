@@ -7,6 +7,7 @@ import { HistoryPanel } from '@renderer/components/HistoryPanel'
 import { OrphanBanner } from '@renderer/components/OrphanBanner'
 import { ReviewPanel } from '@renderer/components/ReviewPanel'
 import type { ExportSelection } from '@renderer/components/ReviewPanel'
+import { SettingsPanel } from '@renderer/components/SettingsPanel'
 
 const settings: Settings = {
   resolution: '1080p',
@@ -17,7 +18,13 @@ const settings: Settings = {
   countdownSeconds: 3,
   shortcut: 'Control+Alt+R',
   outputDir: '/home/alejandro/Vídeos/Capturas',
-  keepSource: true
+  keepSource: true,
+  systemAudio: false,
+  micAudio: false,
+  micDeviceId: 'default',
+  systemAudioGain: 1,
+  micGain: 1,
+  normalizeAudio: true
 }
 
 const entry: HistoryEntry = {
@@ -103,6 +110,24 @@ describe('ReviewPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
     expect(onCancelExport).toHaveBeenCalledOnce()
   })
+
+  it('indica cuando la grabación incluye audio', () => {
+    render(
+      <ReviewPanel
+        entry={{ ...entry, hasAudio: true }}
+        defaults={settings}
+        exporting={false}
+        exportPercent={null}
+        onExport={vi.fn()}
+        onCancelExport={vi.fn()}
+        onNewRecording={vi.fn()}
+        onDelete={vi.fn()}
+        onReveal={vi.fn()}
+      />
+    )
+
+    expect(screen.getByText(/Con audio/)).toBeInTheDocument()
+  })
 })
 
 describe('HistoryPanel', () => {
@@ -144,6 +169,126 @@ describe('HistoryPanel', () => {
     )
 
     expect(screen.getByText('Todavía no has grabado nada.')).toBeInTheDocument()
+  })
+
+  it('marca las grabaciones que incluyen audio', () => {
+    render(
+      <HistoryPanel
+        entries={[{ ...entry, hasAudio: true }]}
+        cleanupBusy={false}
+        onReexport={vi.fn()}
+        onOpenFolder={vi.fn()}
+        onRevealEntry={vi.fn()}
+        onDelete={vi.fn()}
+        onCleanup={vi.fn()}
+      />
+    )
+
+    expect(screen.getByText('Con audio')).toBeInTheDocument()
+  })
+})
+
+describe('SettingsPanel', () => {
+  it('muestra las casillas de audio del sistema y micrófono', () => {
+    render(
+      <SettingsPanel
+        settings={settings}
+        cursorNotice="Aviso de cursor"
+        audioInputs={[]}
+        canEnableSystemAudio
+        onChange={vi.fn()}
+      />
+    )
+
+    expect(screen.getByRole('checkbox', { name: 'Audio del sistema' })).not.toBeChecked()
+    expect(screen.getByRole('checkbox', { name: 'Micrófono' })).not.toBeChecked()
+    expect(screen.queryByLabelText('Dispositivo de entrada')).not.toBeInTheDocument()
+  })
+
+  it('activa el audio del sistema y el micrófono de forma independiente', () => {
+    const onChange = vi.fn()
+    const { rerender } = render(
+      <SettingsPanel
+        settings={settings}
+        cursorNotice="Aviso de cursor"
+        audioInputs={[]}
+        canEnableSystemAudio
+        onChange={onChange}
+      />
+    )
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Audio del sistema' }))
+    expect(onChange).toHaveBeenCalledWith({ systemAudio: true })
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Micrófono' }))
+    expect(onChange).toHaveBeenCalledWith({ micAudio: true })
+
+    rerender(
+      <SettingsPanel
+        settings={{ ...settings, micAudio: true }}
+        cursorNotice="Aviso de cursor"
+        audioInputs={[
+          { deviceId: 'mic-1', label: 'Micrófono USB' },
+          { deviceId: 'mic-2', label: 'Auriculares' }
+        ]}
+        canEnableSystemAudio
+        onChange={onChange}
+      />
+    )
+
+    const select = screen.getByLabelText('Dispositivo de entrada')
+    expect(select).toHaveValue('default')
+    expect(screen.getByRole('option', { name: 'Predeterminado del sistema' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Micrófono USB' })).toBeInTheDocument()
+
+    fireEvent.change(select, { target: { value: 'mic-1' } })
+    expect(onChange).toHaveBeenCalledWith({ micDeviceId: 'mic-1' })
+  })
+
+  it('desactiva el audio del sistema cuando la plataforma no lo soporta', () => {
+    render(
+      <SettingsPanel
+        settings={{ ...settings, systemAudio: true }}
+        cursorNotice="Aviso de cursor"
+        audioInputs={[]}
+        canEnableSystemAudio={false}
+        onChange={vi.fn()}
+      />
+    )
+
+    expect(screen.getByRole('checkbox', { name: 'Audio del sistema' })).toBeDisabled()
+  })
+
+  it('ajusta la ganancia de cada fuente y la normalización', () => {
+    const onChange = vi.fn()
+    render(
+      <SettingsPanel
+        settings={{
+          ...settings,
+          systemAudio: true,
+          micAudio: true,
+          systemAudioGain: 2,
+          micGain: 1.5,
+          normalizeAudio: true
+        }}
+        cursorNotice="Aviso de cursor"
+        audioInputs={[]}
+        canEnableSystemAudio
+        onChange={onChange}
+      />
+    )
+
+    expect(screen.getByText('×2')).toBeInTheDocument()
+    expect(screen.getByText('×1,5')).toBeInTheDocument()
+
+    fireEvent.change(screen.getByLabelText('Volumen del sistema'), { target: { value: '3' } })
+    expect(onChange).toHaveBeenCalledWith({ systemAudioGain: 3 })
+
+    fireEvent.change(screen.getByLabelText('Volumen del micrófono'), { target: { value: '0.7' } })
+    expect(onChange).toHaveBeenCalledWith({ micGain: 0.7 })
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Normalizar volumen al exportar' }))
+    expect(onChange).toHaveBeenCalledWith({ normalizeAudio: false })
   })
 })
 

@@ -28,6 +28,7 @@ export interface RecoveredMetadata {
   height: number
   fps: number
   mode: RecordingMode
+  hasAudio?: boolean
 }
 
 export interface CleanupResult {
@@ -121,6 +122,7 @@ export class HistoryStore {
       height: metadata.height,
       fps: metadata.fps,
       mode: metadata.mode,
+      hasAudio: metadata.hasAudio === true,
       sourcePath,
       thumbPath: existsSync(thumbPath) ? thumbPath : null,
       exports: [],

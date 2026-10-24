@@ -1,12 +1,13 @@
 # Captura
 
-Grabador de pantalla simple para Linux y Windows. Graba una pantalla completa, una ventana concreta o una región rectangular y exporta un MP4 H.264 compatible con cualquier reproductor.
-
-Sin audio en esta versión. Interfaz en español.
+Grabador de pantalla simple para Linux y Windows. Graba una pantalla completa, una ventana concreta o una región rectangular, con audio del sistema y micrófono opcionales, y exporta un MP4 H.264+AAC compatible con cualquier reproductor. Interfaz en español.
 
 ## Características
 
 - **Pantalla, ventana o región**. En Linux Wayland la fuente se elige en el diálogo del sistema (portal PipeWire); en Windows y X11 hay galería de miniaturas.
+- **Audio opcional**: sonido del sistema, micrófono (con selección de dispositivo) o ambos mezclados en una sola pista.
+- **Ganancia por fuente y normalización**: volumen de entrada ajustable de 0,5× a 4× y normalización de sonoridad `loudnorm` al exportar (activada por defecto).
+- **Medidor de nivel** en vivo durante la grabación para comprobar que el audio se está captando.
 - **Resolución y FPS configurables** al exportar: nativa, 2160p, 1440p, 1080p, 720p o personalizada; 15/24/30/60 FPS o valor libre.
 - **Calidad** Alta, Media o Baja (CRF de libx264).
 - **Cuenta atrás de 3 s** cancelable con Escape.
@@ -108,9 +109,10 @@ renderer (React)                       main (Node/Electron)
 ```
 
 - **Captura**: `getDisplayMedia` en el renderer. En Wayland se usa `setDisplayMediaRequestHandler({ useSystemPicker: true })` y el portal de GNOME; no se enumeran ventanas porque PipeWire no lo permite. En Windows/X11 se eligen miniaturas con `desktopCapturer`.
-- **Intermedio**: WebM VP9 (fallback VP8) con bitrate calculado por resolución/FPS/calidad. Los fragmentos se envían al main y se escriben en disco de forma incremental.
-- **Región**: fotograma congelado en la propia ventana (funciona en Wayland) y pipeline de canvas que solo dibuja el rectángulo.
-- **Exportación**: MP4 H.264 con `libx264`, `yuv420p`, `+faststart`, sin audio, escritura atómica `.part` y renombrado final. El progreso se lee de `-progress pipe:1`.
+- **Intermedio**: WebM VP9/VP8 (+ Opus cuando hay audio) con bitrate calculado por resolución/FPS/calidad. Los fragmentos se envían al main y se escriben en disco de forma incremental.
+- **Audio**: el audio del sistema se solicita con `getDisplayMedia({ audio: true })` y `audio: 'loopback'` en el handler de Electron; el micrófono se obtiene con `getUserMedia`. Cada fuente pasa por un `GainNode` (0,5×–4×) y se mezcla con `AudioContext` cuando ambas están activas; un `AnalyserNode` alimenta el medidor en vivo.
+- **Región**: fotograma congelado en la propia ventana (funciona en Wayland) y pipeline de canvas que solo dibuja el rectángulo; la pista de audio se adjunta al stream del canvas.
+- **Exportación**: MP4 H.264 con `libx264`, `yuv420p`, `+faststart` y audio AAC (`-map 0:a:0?`) cuando la grabación lo incluye, con normalización `loudnorm=I=-16:TP=-1.5:LRA=11` opcional, escritura atómica `.part` y renombrado final. El progreso se lee de `-progress pipe:1`.
 - **Seguridad**: `contextIsolation`, `sandbox`, sin `nodeIntegration`; el renderer solo accede a la API de preload. CSP estricta en producción y protocolo `captura-media` limitado a grabaciones del historial.
 
 Más detalle en `openspec/changes/add-screen-recorder/design.md`.
@@ -120,7 +122,7 @@ Más detalle en `openspec/changes/add-screen-recorder/design.md`.
 - **Wayland no permite enumerar ventanas**. La selección se delega en el diálogo del sistema; la app no muestra su propia galería.
 - **El cursor no se puede desactivar**. Lo incluye el compositor o el sistema de captura; el control aparece desactivado con una explicación.
 - **Atajos globales en GNOME Wayland** requieren identidad de portal válida: instala el `.deb` y acepta el diálogo de consentimiento la primera vez. En AppImage o ejecutando sin empaquetar puede no registrarse; la app lo avisa y permite grabar desde la ventana.
-- **Sin audio** en esta versión. El pipeline está preparado para añadirlo con `-c:a aac`.
+- **Audio del sistema en Wayland**: depende de que el portal exponga el loopback; si no lo entrega, la grabación continúa con vídeo y micrófono. La captura de una ventana individual puede no incluir audio del sistema.
 - **Windows sin firmar**: SmartScreen puede mostrar un aviso.
 - **4K a 60 FPS** puede consumir mucha CPU al recodificar; baja la resolución/FPS si es necesario.
 - La compilación de `ffmpeg-static` es **GPL** e incluye libx264. Si redistribuyes la app debes cumplir esa licencia.
@@ -131,7 +133,7 @@ Más detalle en `openspec/changes/add-screen-recorder/design.md`.
 | ----------------------------------------------------------------------------- | ------ |
 | `pnpm install` + `pnpm dev` arrancan Electron en Linux                        | ✅     |
 | `pnpm lint`, `typecheck`, `build`                                             | ✅     |
-| 205 tests unitarios y de UI                                                   | ✅     |
+| 236 tests unitarios y de UI                                                   | ✅     |
 | Arranque Electron en GNOME Wayland (smoke)                                    | ✅     |
 | Grabación sintética → IPC → miniatura → MP4 H.264 sin audio                   | ✅     |
 | Exportación con recorte, 320 × 240 y 24 FPS                                   | ✅     |
