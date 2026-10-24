@@ -1,0 +1,116 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Etiqueta ya creada (por ejemplo, v0.1.0)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  TAG_NAME: ${{ github.event.inputs.tag || github.ref_name }}
+
+jobs:
+  build:
+    name: Empaquetar (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux
+            artifact: captura-linux
+            files: |
+              dist/*.AppImage
+              dist/*.deb
+          - os: windows-latest
+            platform: win
+            artifact: captura-windows
+            files: |
+              dist/*.exe
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Comprobar que la etiqueta coincide con package.json
+        shell: bash
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          if [ "$TAG_NAME" != "v$version" ]; then
+            echo "::error::La etiqueta $TAG_NAME no coincide con la versión $version de package.json."
+            exit 1
+          fi
+
+      - run: pnpm lint
+      - run: pnpm test
+      - run: pnpm build
+
+      - name: Generar el paquete de la plataforma
+        run: pnpm exec electron-builder --${{ matrix.platform }} --publish never
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.files }}
+          if-no-files-found: error
+          retention-days: 7
+
+  release:
+    name: Publicar en GitHub
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: release
+          merge-multiple: true
+
+      - name: Mostrar los archivos que se publicarán
+        run: ls -lh release
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TAG_NAME }}
+          name: Captura ${{ env.TAG_NAME }}
+          draft: false
+          prerelease: false
+          fail_on_unmatched_files: true
+          files: release/*
+          body: |
+            Grabador de pantalla simple para Linux y Windows.
+
+            ## Instalación
+
+            - **Linux (Debian/Ubuntu)**: descarga `captura_*_amd64.deb` y ejecútalo con
+              `sudo apt install ./captura_*_amd64.deb`.
+            - **Linux (universal)**: descarga `Captura-*.AppImage`, dale permisos de ejecución
+              (`chmod +x Captura-*.AppImage`) y ábrelo.
+            - **Windows x64**: descarga `Captura Setup *.exe` y sigue el asistente. La instalación
+              es por usuario y no requiere permisos de administrador.
+
+            > Los paquetes no están firmados digitalmente. Windows puede mostrar un aviso de
+            > SmartScreen; elige «Más información → Ejecutar de todas formas».

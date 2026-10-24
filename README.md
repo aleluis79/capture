@@ -98,6 +98,20 @@ En Linux, `pnpm dev` añade `--no-sandbox` solo en desarrollo cuando `chrome-san
 
 FFmpeg se copia desde `node_modules/ffmpeg-static` a `resources/ffmpeg/`. No se compila Windows desde Linux: usa un runner Windows (la matriz de CI lo hace) porque `ffmpeg-static` descarga el binario de la plataforma de instalación.
 
+### Publicar una versión (GitHub Releases)
+
+El workflow `.github/workflows/release.yml` crea el Release con los instaladores de Linux y Windows al empujar una etiqueta `v*`:
+
+```bash
+pnpm version patch        # o minor / major: actualiza package.json, hace commit y crea la etiqueta vX.Y.Z
+git push origin main --tags
+```
+
+- La etiqueta debe ser `v` + la versión de `package.json`; el workflow falla si no coinciden.
+- Linux publica `captura_*_amd64.deb` y `Captura-*.AppImage`; Windows publica `Captura Setup *.exe` (NSIS x64).
+- El Release solo se publica si ambos empaquetados terminan correctamente.
+- Para rehacer un Release ya etiquetado, lanza el workflow a mano (_Run workflow_) indicando la etiqueta; se reemplazan los archivos del Release existente.
+
 ## Arquitectura
 
 ```
