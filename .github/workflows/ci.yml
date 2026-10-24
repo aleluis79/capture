@@ -45,10 +45,10 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            command: pnpm exec electron-builder --linux
+            command: pnpm exec electron-builder --linux --publish never
             artifact: captura-linux
           - os: windows-latest
-            command: pnpm exec electron-builder --win
+            command: pnpm exec electron-builder --win --publish never
             artifact: captura-windows
     steps:
       - uses: actions/checkout@v4

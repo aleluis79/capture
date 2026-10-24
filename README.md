@@ -108,7 +108,7 @@ git push origin main --tags
 ```
 
 - La etiqueta debe ser `v` + la versión de `package.json`; el workflow falla si no coinciden.
-- Linux publica `captura_*_amd64.deb` y `Captura-*.AppImage`; Windows publica `Captura Setup *.exe` (NSIS x64).
+- Linux publica `captura_*_amd64.deb` y `Captura-*.AppImage`; Windows publica `Captura.Setup.*.exe` (NSIS x64, GitHub sustituye los espacios del nombre por puntos).
 - El Release solo se publica si ambos empaquetados terminan correctamente.
 - Para rehacer un Release ya etiquetado, lanza el workflow a mano (_Run workflow_) indicando la etiqueta; se reemplazan los archivos del Release existente.
 

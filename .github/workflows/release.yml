@@ -109,7 +109,7 @@ jobs:
               `sudo apt install ./captura_*_amd64.deb`.
             - **Linux (universal)**: descarga `Captura-*.AppImage`, dale permisos de ejecución
               (`chmod +x Captura-*.AppImage`) y ábrelo.
-            - **Windows x64**: descarga `Captura Setup *.exe` y sigue el asistente. La instalación
+            - **Windows x64**: descarga `Captura.Setup.*.exe` y sigue el asistente. La instalación
               es por usuario y no requiere permisos de administrador.
 
             > Los paquetes no están firmados digitalmente. Windows puede mostrar un aviso de
